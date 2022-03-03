@@ -1,3 +1,10 @@
+
+// Don't use on tokens with anti-bot measures you will get taxed 99% or blacklisted. Best to use with tokens with no tax.
+// You need a node with Websocket endpoint sign up at getBlock.io they have 40k free requests per day. 
+// 40k is not much this bot will burn that much very quickly, you will have to buy more requests.
+// Best to start bot 30 secs to 60 secs before launch 
+// Use at your own risk
+
 const ethers = require('ethers');
 require('dotenv').config();
 
@@ -7,10 +14,7 @@ const addresses = {
 	recipient: process.env.recipient,
 	buyContract: '0xDC56800e179964C3C00a73f73198976397389d26',
 
-
-
-
-	contractCreator: '', // Contract creator
+	contractCreator: '', // Contract creator, the owner of the contract you can find it on bscscan
 	contractAddress: '' // Token address
 }
 const mnemonic = process.env.mnemonic;
@@ -19,7 +23,14 @@ const mnemonic = process.env.mnemonic;
 
 const investmentAmount = '0.05';
 
+/**
+* False means that liquidity is already added and the token developer (contract owner) needs to call a function to start trading token 
+* we need to find out what function he is going to call can find on bscscan. 
+* True means we can buy token when liquidity is added trading is open when liquidity is added.
+*/
+const tradeIsEnabled = false; 
 
+// Triggers that contract developer might use to launch token ex setTradingEnabled
 const triggers =
 	[
 		'openTrade',
@@ -38,7 +49,26 @@ const triggers =
 		'setBuyFee'
 	];
 
-const tradeIsEnabled = false;
+// Possible functions that contract owner might call, you will need to look at token contract and find out what token needs to be called to launch token 
+// and paste function signature below and paste function name above.
+const triggersABI = [
+	'function openTrade()',
+	'function addLiquidityETH(address token,uint amountTokenDesired,uint amountTokenMin,uint amountETHMin,address to,uint deadline)',
+	'function setMarketingFee(uint256 value)',
+	'function setLiquidityFee(uint256 value)',
+	'function setMaxTxLimit(uint256 maxLimitPercent)',
+	'function enableTrading()',
+	'function setTradingIsEnabled(bool _enabled)',
+	'function setMaxTx(uint256 maxTx)',
+	'function openTrading(uint256 _deadBlocks)',
+	'function tradingStatus(bool _status)',
+	'function SetupEnableTrading()',
+	'function updateTradingEnabled(bool _enabled)',
+	'function setTradingEnabled( bool _enabled,uint256 _deadline,uint256 _launchtax)',
+	'function setBuyFee(uint16 taxReflection,uint16 marketing,uint16 dev,uint16 RnD)'
+]
+
+
 const myGasLimit = 2100000;
 const mygasPriceForApproval = ethers.utils.parseUnits('5', 'gwei');
 
@@ -50,7 +80,6 @@ let tokenIn, tokenOut;
 tokenIn = addresses.WBNB;
 tokenOut = addresses.contractAddress;
 const amountIn = ethers.utils.parseUnits(investmentAmount, 'ether');
-var count = 0;
 
 let pancakeAbi = [
 	'function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)',
@@ -74,22 +103,6 @@ let tokenAbi = [
 	'function transfer(address to, uint amount) returns (bool)',
 	'function buyTokens(address tokenAddress, address to) payable'
 ];
-const triggersABI = [
-	'function openTrade()',
-	'function addLiquidityETH(address token,uint amountTokenDesired,uint amountTokenMin,uint amountETHMin,address to,uint deadline)',
-	'function setMarketingFee(uint256 value)',
-	'function setLiquidityFee(uint256 value)',
-	'function setMaxTxLimit(uint256 maxLimitPercent)',
-	'function enableTrading()',
-	'function setTradingIsEnabled(bool _enabled)',
-	'function setMaxTx(uint256 maxTx)',
-	'function openTrading(uint256 _deadBlocks)',
-	'function tradingStatus(bool _status)',
-	'function SetupEnableTrading()',
-	'function updateTradingEnabled(bool _enabled)',
-	'function setTradingEnabled( bool _enabled,uint256 _deadline,uint256 _launchtax)',
-	'function setBuyFee(uint16 taxReflection,uint16 marketing,uint16 dev,uint16 RnD)'
-]
 
 let contract = new ethers.Contract(addresses.contractAddress, tokenAbi, account);
 let tokenInter = new ethers.utils.Interface(triggersABI);
@@ -98,7 +111,7 @@ const buyContract = new ethers.Contract(addresses.buyContract, tokenAbi, account
 
 async function buy(gas) {
 	try {
-		if (count == 0) {
+		
 			const tx = await buyContract.buyTokens(tokenOut, addresses.recipient,
 				{
 					value: amountIn.toString(),
@@ -109,7 +122,7 @@ async function buy(gas) {
 			const receipt = await tx.wait();
 			console.log("Buy transaction hash: ", receipt.transactionHash);
 			approve();
-		}
+		
 	} catch (err) {
 		console.log(err);
 	}
@@ -139,17 +152,23 @@ const init = function () {
 	wsProvider.on("Pending", (tx) => {
 		wsProvider.getTransaction(tx).then(function (transaction) {
 			if (transaction != null) {
-				console.log(transaction);
+				
+				// Trading is enabled we can scan for dev transaction for liquidity.
 				if (tradeIsEnabled) {
 					if (transaction.from == addresses.contractCreator && transaction.to == pancakeRouter.address) {
 						console.log(tx);
+						
+						// we need to copy the developers gas price so we are not too early and transaction wont fail
 						let gas = transaction.gasPrice;
 						buy(gas);
 					}
 				} else {
+					// Trading is not enabled and liquidity is already added we need to scan for dev transaction to open trade.
 					try {
 						const decodes = tokenInter.parseTransaction({ data: transaction.data, value: transaction.value });
 						if (transaction.from == addresses.contractCreator && triggers.includes(decodes.name)) {
+							console.log(tx);
+							// we need to copy the developers gas price so we are not too early and transaction wont fail 
 							let gas = transaction.gasPrice;
 							buy(gas);
 						}
