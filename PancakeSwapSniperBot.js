@@ -153,7 +153,8 @@ const init = function () {
 		wsProvider.getTransaction(tx).then(function (transaction) {
 			if (transaction != null) {
 				
-				// Trading is enabled we can scan for dev transaction for liquidity.
+				// Trading is enabled we can scan for dev transaction for liquidity. 
+				// This wont work if dev had presale on dxsale, pinksale etc
 				if (tradeIsEnabled) {
 					if (transaction.from == addresses.contractCreator && transaction.to == pancakeRouter.address) {
 						console.log(tx);
