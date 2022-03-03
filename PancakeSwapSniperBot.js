@@ -49,7 +49,7 @@ const triggers =
 		'setBuyFee'
 	];
 
-// Possible functions that contract owner might call, you will need to look at token contract and find out what token needs to be called to launch token 
+// Possible functions that contract owner might call, you will need to look at token contract and find out what function needs to be called to launch token 
 // and paste function signature below and paste function name above.
 const triggersABI = [
 	'function openTrade()',
