@@ -24,11 +24,11 @@ const mnemonic = process.env.mnemonic;
 const investmentAmount = '0.05';
 
 /**
-* False means that liquidity is already added and the token developer (contract owner) needs to call a function to start trading token 
+* token developer (contract owner) needs to call a function to start trading token 
 * we need to find out what function he is going to call can find on bscscan. 
-* True means we can buy token when liquidity is added trading is open when liquidity is added.
+* 
 */
-const tradeIsEnabled = false; 
+
 
 // Triggers that contract developer might use to launch token ex setTradingEnabled
 const triggers =
@@ -46,7 +46,8 @@ const triggers =
 		'SetupEnableTrading',
 		'updateTradingEnabled',
 		'setTradingEnabled',
-		'setBuyFee'
+		'setBuyFee',
+		'finalize'
 	];
 
 // Possible functions that contract owner might call, you will need to look at token contract and find out what function needs to be called to launch token 
@@ -65,7 +66,8 @@ const triggersABI = [
 	'function SetupEnableTrading()',
 	'function updateTradingEnabled(bool _enabled)',
 	'function setTradingEnabled( bool _enabled,uint256 _deadline,uint256 _launchtax)',
-	'function setBuyFee(uint16 taxReflection,uint16 marketing,uint16 dev,uint16 RnD)'
+	'function setBuyFee(uint16 taxReflection,uint16 marketing,uint16 dev,uint16 RnD)',
+	'function finalize()'
 ]
 
 
@@ -111,17 +113,16 @@ const buyContract = new ethers.Contract(addresses.buyContract, tokenAbi, account
 
 async function buy(gas) {
 	try {
-		
-			const tx = await buyContract.buyTokens(tokenOut, addresses.recipient,
-				{
-					value: amountIn.toString(),
-					gasPrice: gas,
-					gasLimit: myGasLimit
+		const tx = await buyContract.buyTokens(tokenOut, addresses.recipient,
+			{
+				value: amountIn.toString(),
+				gasPrice: gas,
+				gasLimit: myGasLimit
 
-				});
-			const receipt = await tx.wait();
-			console.log("Buy transaction hash: ", receipt.transactionHash);
-			approve();
+			});
+		const receipt = await tx.wait();
+		console.log("Buy transaction hash: ", receipt.transactionHash);
+		approve();
 		
 	} catch (err) {
 		console.log(err);
@@ -152,30 +153,16 @@ const init = function () {
 	wsProvider.on("Pending", (tx) => {
 		wsProvider.getTransaction(tx).then(function (transaction) {
 			if (transaction != null) {
-				
-				// Trading is enabled we can scan for dev transaction for liquidity. 
-				// This wont work if dev had presale on dxsale, pinksale etc
-				if (tradeIsEnabled) {
-					if (transaction.from == addresses.contractCreator && transaction.to == pancakeRouter.address) {
+				try {
+					const decodes = tokenInter.parseTransaction({ data: transaction.data, value: transaction.value });
+					if (transaction.from == addresses.contractCreator && triggers.includes(decodes.name)) {
 						console.log(tx);
-						
-						// we need to copy the developers gas price so we are not too early and transaction wont fail
+						// we need to copy the developers gas price so we are not too early and transaction wont fail 
 						let gas = transaction.gasPrice;
 						buy(gas);
 					}
-				} else {
-					// Trading is not enabled and liquidity is already added we need to scan for dev transaction to open trade.
-					try {
-						const decodes = tokenInter.parseTransaction({ data: transaction.data, value: transaction.value });
-						if (transaction.from == addresses.contractCreator && triggers.includes(decodes.name)) {
-							console.log(tx);
-							// we need to copy the developers gas price so we are not too early and transaction wont fail 
-							let gas = transaction.gasPrice;
-							buy(gas);
-						}
-					} catch (e) {
+				} catch (e) {
 					
-					}
 				}
 			}
 		}).catch(function (e) {
