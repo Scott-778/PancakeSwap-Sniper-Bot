@@ -1,5 +1,5 @@
 
-// Don't use on tokens with anti-bot measures you will get taxed 99% or blacklisted. Best to use with tokens with no tax.
+// Don't use on tokens with anti-bot measures you will get taxed 99% or blacklisted. Best to use with tokens with no tax and no anti-bot measures.
 // You need a node with Websocket endpoint sign up at getBlock.io they have 40k free requests per day. 
 // 40k is not much this bot will burn that much very quickly, you will have to buy more requests.
 // Best to start bot 30 secs to 60 secs before launch 
